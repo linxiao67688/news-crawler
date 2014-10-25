@@ -1,0 +1,65 @@
+url<-"http://www.chinadaily.com.cn/china/2014-10/23/content_18787177.htm"
+#--------------get the content of news----------------
+getnewscontent<-function(url){
+    raw<-readLines(url,encoding="UTF-8")
+    text<-raw[(grep("</p>",raw))]
+    text<-grep("</p>",raw,value=TRUE)
+    new<-gregexpr('>\\w+',text)
+    text1<-sub("</*[A-Za-z]+.*>+[A-Za-z]","",text)
+    text2<-sub("</*[A-Za-z]+.*>+</*[A-Za-z]+.*>*","",text1)
+    content<-sub("</*\\w+.*>+[A-Z0-9a-z]*","",text2)
+    return<-content
+}
+#-------------get ten news from internet---------------------
+library(XML)
+url<-"http://www.chinadaily.com.cn/china/2014-10/23/content_18787177.htm"
+url.html<-htmlParse(url,encoding="UTF-8")
+xpath<-"//li/a"
+url.node<-getNodeSet(url.html,xpath)
+urllist<-c()
+i<-20
+while(i<30){
+    url<-xmlGetAttr(url.node[[i]],'href')
+    print(url)
+    urllist<-c(urllist,c(url))
+    i<-i+1
+}
+print(urllist)
+corpus<-c() 
+for(url_i in urllist){
+   corpus_i<-""
+   url_i.content<-getnewscontent(url_i)
+   for(i in url_i.content){
+       corpus_i<-paste(corpus_i,i)
+   }
+   corpus<-c(corpus,c(list(corpus_i)))
+}
+#--------------perform pretreatment for ten news----------------
+library(tm)
+pretreatment<-function(newscontent){
+  newscontent<-tm_map(newscontent,PlainTextDocument)
+  newscontent<-tm_map(newscontent,stripWhitespace)
+  newscontent<-tm_map(newscontent,tolower)
+  newscontent<-tm_map(newscontent,stemDocument)
+  newscontent<-tm_map(newscontent,removeWords,stopwords("en"))
+  
+  result<-newscontent
+}
+gracorpus<-c()
+for(corpus_i in corpus){
+   corpus_i<-Corpus(VectorSource(corpus_i))
+   corpus_i<-pretreatment(corpus_i)
+   gracorpus<-c(gracorpus,c(list(corpus_i)))
+}
+#-----------------word_frequency analysis-----------------------
+print("The highest frequency words in every news are as follow:")
+gracopusl<-Corpus(VectorSource(gracorpus))
+wordfrequency<-DocumentTermMatrix(gracopusl)
+wordfrequency <- removeSparseTerms(wordfrequency, 0.8)
+findFreqTerms(wordfrequency, 5)
+word.matrix<-as.matrix(wordfrequency)
+word.freq<-apply(word.matrix,2,sum)
+names(word.freq)<-colnames(word.matrix)
+rev(sort(word.freq))[1:30]
+plot(word.freq);text(c(1:length(word.freq)),word.freq,name(word.freq))
+ barplot(word.freq);text(c(1:as.integer(length(word.freq))),c(1:as.integer(length(word.freq))),names(word.freq))
